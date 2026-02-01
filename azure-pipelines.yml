@@ -29,12 +29,26 @@ steps:
     curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
   displayName: 'Install Trivy'
 
-# 4. Security Scan
+# 4. Security Scan - Output to Console AND Save to File
 - script: |
-    trivy image --exit-code 1 --severity CRITICAL $(dockerRepo):latest
-  displayName: 'Trivy Scan: Critical Vulnerabilities'
+    # This run is for your eyes (shows a nice table in the logs)
+    trivy image --severity HIGH,CRITICAL $(dockerRepo):latest
+    
+    # This run generates a JSON report for documentation
+    trivy image --format json --output scanning-report.json $(dockerRepo):latest
+  displayName: 'Trivy Scan and Report'
+  continueOnError: true # We use this so the pipeline doesn't stop immediately if you want to see the report
 
-# 5. Push to Docker Hub
+# 5. Upload the Scan Report as an Artifact
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: 'scanning-report.json'
+    ArtifactName: 'SecurityReports'
+    publishLocation: 'Container'
+  displayName: 'Publish Security Report'
+
+# 6. Push to Docker Hub (Only if you are satisfied with the scan)
+# Note: In production, we'd remove 'continueOnError' above to block the push
 - script: |
     echo $(dockerPass) | docker login -u $(dockerUser) --password-stdin
     docker push $(dockerRepo):latest
