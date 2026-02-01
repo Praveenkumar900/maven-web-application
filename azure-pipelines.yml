@@ -1,22 +1,38 @@
-# Maven
-# Build your Java project and run tests with Apache Maven.
-# Add steps that analyze code, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/java
-
 trigger:
-- master
+- main
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
+
+variables:
+  imageName: 'my-app'
+  registryName: 'youracr.azurecr.io'
 
 steps:
-- task: Maven@3
+# 1. Build the Docker Image locally on the agent
+- task: Docker@2
+  displayName: 'Build Docker Image'
   inputs:
-    mavenPomFile: 'pom.xml'
-    mavenOptions: '-Xmx3072m'
-    javaHomeOption: 'JDKVersion'
-    jdkVersionOption: '1.11'
-    jdkArchitectureOption: 'x64'
-    publishJUnitResults: true
-    testResultsFiles: '**/surefire-reports/TEST-*.xml'
-    goals: 'package'
+    command: 'build'
+    dockerfile: '**/Dockerfile'
+    repository: $(imageName)
+    tags: 'latest'
+
+# 2. Install Trivy
+- script: |
+    curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+  displayName: 'Install Trivy'
+
+# 3. Scan the image and FAIL if CRITICAL vulnerabilities are found
+- script: |
+    trivy image --exit-code 1 --severity CRITICAL $(imageName):latest
+  displayName: 'Scan Image for Critical Vulnerabilities'
+
+# 4. Push to Registry (Only runs if the scan above passes)
+- task: Docker@2
+  displayName: 'Push to ACR'
+  inputs:
+    containerRegistry: 'YourServiceConnection'
+    repository: $(imageName)
+    command: 'push'
+    tags: 'latest'
