@@ -5,34 +5,31 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  imageName: 'my-app'
-  registryName: 'youracr.azurecr.io'
+  # Using your specific details
+  dockerRegistry: 'docker.io'
+  dockerRepo: 'pjasthi/mavenapp'
+  dockerUser: 'pjasthi'
+  dockerPass: 'Azure@9076' 
 
 steps:
-# 1. Build the Docker Image locally on the agent
-- task: Docker@2
+# 1. Build the Docker Image
+- script: |
+    docker build -t $(dockerRepo):latest .
   displayName: 'Build Docker Image'
-  inputs:
-    command: 'build'
-    dockerfile: '**/Dockerfile'
-    repository: $(imageName)
-    tags: 'latest'
 
 # 2. Install Trivy
 - script: |
     curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
   displayName: 'Install Trivy'
 
-# 3. Scan the image and FAIL if CRITICAL vulnerabilities are found
+# 3. Security Scan (The Resume-Booster Step)
+# This will fail the pipeline if it finds CRITICAL vulnerabilities
 - script: |
-    trivy image --exit-code 1 --severity CRITICAL $(imageName):latest
-  displayName: 'Scan Image for Critical Vulnerabilities'
+    trivy image --exit-code 1 --severity CRITICAL $(dockerRepo):latest
+  displayName: 'Trivy Scan: Critical Vulnerabilities'
 
-# 4. Push to Registry (Only runs if the scan above passes)
-- task: Docker@2
-  displayName: 'Push to ACR'
-  inputs:
-    containerRegistry: 'YourServiceConnection'
-    repository: $(imageName)
-    command: 'push'
-    tags: 'latest'
+# 4. Login and Push (Only runs if Trivy finds 0 Criticals)
+- script: |
+    echo $(dockerPass) | docker login $(dockerRegistry) -u $(dockerUser) --password-stdin
+    docker push $(dockerRepo):latest
+  displayName: 'Push to Docker Hub'
