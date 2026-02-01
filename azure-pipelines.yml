@@ -5,31 +5,37 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  # Using your specific details
-  dockerRegistry: 'docker.io'
   dockerRepo: 'pjasthi/mavenapp'
   dockerUser: 'pjasthi'
-  dockerPass: 'Azure@9076' 
+  dockerPass: 'Azure@9076'
 
 steps:
-# 1. Build the Docker Image
+# 1. Build the Java Artifact (.war file)
+- task: Maven@4
+  displayName: 'Maven Package'
+  inputs:
+    mavenPomFile: 'pom.xml'
+    goals: 'clean package'
+    publishJUnitResults: false
+
+# 2. Build the Docker Image 
+# Ensure your Dockerfile does: COPY target/*.war /usr/local/tomcat/webapps/
 - script: |
     docker build -t $(dockerRepo):latest .
   displayName: 'Build Docker Image'
 
-# 2. Install Trivy
+# 3. Install Trivy
 - script: |
     curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
   displayName: 'Install Trivy'
 
-# 3. Security Scan (The Resume-Booster Step)
-# This will fail the pipeline if it finds CRITICAL vulnerabilities
+# 4. Security Scan
 - script: |
     trivy image --exit-code 1 --severity CRITICAL $(dockerRepo):latest
   displayName: 'Trivy Scan: Critical Vulnerabilities'
 
-# 4. Login and Push (Only runs if Trivy finds 0 Criticals)
+# 5. Push to Docker Hub
 - script: |
-    echo $(dockerPass) | docker login $(dockerRegistry) -u $(dockerUser) --password-stdin
+    echo $(dockerPass) | docker login -u $(dockerUser) --password-stdin
     docker push $(dockerRepo):latest
   displayName: 'Push to Docker Hub'
