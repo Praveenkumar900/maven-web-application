@@ -5,3 +5,4 @@
 FROM tomcat:9.0.30-jdk8-openjdk
 COPY target/*.war /usr/local/tomcat/webapps/maven-web-application.war
 
+AWS_SECRET_ACCESS_KEY=AKIAIMNO789ABCDEFGH
