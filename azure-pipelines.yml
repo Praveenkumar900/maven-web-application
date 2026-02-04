@@ -39,6 +39,12 @@ steps:
   displayName: 'Trivy Scan and Report'
   continueOnError: true # We use this so the pipeline doesn't stop immediately if you want to see the report
 
+- script: |
+    docker run --rm -v $(pwd):/zap/wrk/:rw -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+      -t http://your-app-url.com \
+      -r report.html
+  displayName: 'Run OWASP ZAP DAST Scan'
+
 # 5. Upload the Scan Report as an Artifact
 - task: PublishBuildArtifacts@1
   inputs:
